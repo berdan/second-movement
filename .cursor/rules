@@ -1,0 +1,150 @@
+# Second Movement - Sensor Watch Firmware Development Rules
+
+## Project Overview
+This is a firmware project for Sensor Watch (https://www.sensorwatch.net), a smartwatch platform. The project is a refactor of the Movement firmware and uses a modular architecture with watch faces.
+
+## Key Architecture Concepts
+
+### Watch Face System
+- Watch faces are modular components that implement specific functionality
+- Each watch face follows a standard interface with setup, activate, loop, and resign functions
+- Watch faces are defined in `movement_faces.h` and organized in subdirectories under `watch-faces/`
+- Template files are available in `template/` for creating new watch faces
+
+### Core Components
+- `movement.h/c`: Main framework that manages watch faces and system state
+- `watch-library/`: Hardware abstraction layer for Sensor Watch hardware
+- `gossamer/`: Board support package for different Sensor Watch variants
+- `utz/`: Time zone and date/time utilities
+- `tinyusb/`: USB communication library
+- `littlefs/`: File system for persistent storage
+
+## Development Guidelines
+
+### Watch Face Development
+1. **Use the template**: Start with `template/template.c` and `template/template.h`
+2. **Follow naming conventions**: Watch face files should be named `{name}_face.c` and `{name}_face.h`
+3. **Implement required functions**:
+   - `{name}_face_setup()`: One-time initialization
+   - `{name}_face_activate()`: Called when face becomes active
+   - `{name}_face_loop()`: Main event handling loop
+   - `{name}_face_resign()`: Cleanup when face becomes inactive
+4. **Handle events properly**: Always handle `EVENT_MODE_BUTTON_UP` to allow navigation
+5. **Add to movement_faces.h**: Include your new face header and add to the watch_face_t array
+
+### Code Style
+- Use MIT License header (see template files)
+- Follow C99 standards
+- Use descriptive variable names
+- Add comprehensive comments for complex logic
+- Use the `movement_` prefix for framework functions
+- Use the `watch_` prefix for hardware abstraction functions
+
+### Hardware Considerations
+- **Low power**: Always consider power consumption, especially in low energy mode. CPU cycles are precious!
+- **Memory constraints**: Limited RAM and flash storage
+- **Real-time constraints**: Watch faces must respond quickly to user input
+- **Display limitations**: Segment LCD with specific character set and layout, and two different LCD layouts supported
+
+### Event Handling
+- Handle `EVENT_TICK` for regular updates (1Hz by default)
+- Handle `EVENT_LOW_ENERGY_UPDATE` for power-efficient updates (1/minute)
+- Handle `EVENT_TIMEOUT` for inactivity management
+- Handle button events appropriately
+- Return `true` from loop function unless actively using LED/buzzer
+
+### Build System
+- Use `make BOARD={board_type} DISPLAY={display_type}` to build
+- Board options: `sensorwatch_pro`, `sensorwatch_green`, `sensorwatch_red`, `sensorwatch_blue`
+- Display options: `classic`, `custom`
+- Add `NOSLEEP=1` to disable low energy mode for debugging
+- Add `EMSCRIPTEN=1` for web simulator builds
+
+## Common Patterns
+
+### State Management
+```c
+typedef struct {
+    // State variables here
+    uint8_t some_counter;
+    bool some_flag;
+} my_face_state_t;
+```
+
+### Event Handling
+```c
+switch (event.event_type) {
+    case EVENT_TICK:
+        // Handle regular updates
+        break;
+    case EVENT_MODE_BUTTON_UP:
+        // Always allow navigation
+        movement_move_to_next_face();
+        break;
+    case EVENT_LOW_ENERGY_UPDATE:
+        // Power-efficient updates
+        break;
+    default:
+        return movement_default_loop_handler(event);
+}
+```
+
+### Display Updates
+- Use `watch_display_string()` for text
+- Use `watch_set_indicator()` for indicators
+- Use `watch_set_pixel()` for custom graphics
+- Consider display refresh timing
+
+### Time and Date
+- Use `movement_get_local_date_time()` for current time
+- Use `movement_get_utc_date_time()` for UTC time
+- Use `utz` functions for timezone calculations
+
+### Settings and Preferences
+- Use `movement_settings_t` for global settings
+- Use backup registers for persistent storage
+- Check `movement_use_imperial_units()` for unit preferences
+- Check `movement_clock_mode_24h()` for time format
+
+## File Organization
+- Watch faces go in `watch-faces/{category}/`
+- Categories: `clock/`, `complication/`, `demo/`, `sensor/`, `settings/`, `io/`
+- Hardware drivers go in `watch-library/hardware/`
+- Shared utilities go in `watch-library/shared/`
+- Board-specific code goes in `gossamer/boards/`
+
+## Testing and Debugging
+- Use the web simulator with `EMSCRIPTEN=1`
+- Use `NOSLEEP=1` for debugging without power management
+- Check serial output for debugging information
+- Test on actual hardware for final validation
+
+## Common Pitfalls to Avoid
+1. **Forgetting to handle EVENT_MODE_BUTTON_UP** - users get stuck on your face
+2. **Not considering power consumption** - battery life suffers
+3. **Ignoring low energy mode** - face may not work in sleep mode
+4. **Not adding face to movement_faces.h** - face won't be included in build
+5. **Using too much memory** - system may become unstable
+6. **Not handling all required events** - face may behave unexpectedly
+7. **Assuming all watches have the same hardware** - sensors may or may not be present
+
+## Useful Functions Reference
+- `movement_move_to_next_face()`: Navigate to next face
+- `movement_move_to_face(index)`: Navigate to specific face
+- `movement_get_local_date_time()`: Get current local time
+- `movement_illuminate_led()`: Turn on LED with settings
+- `movement_play_signal()`: Play button sound
+- `watch_display_string()`: Display text on LCD
+- `watch_set_indicator()`: Set display indicators
+- `watch_set_pixel()`: Set individual pixels
+- `watch_get_pin_level()`: Read button states
+- `watch_enable_display()`: Enable/disable display
+
+## When Creating New Features
+1. Consider if it should be a new watch face or modification to existing
+2. Check if similar functionality already exists
+3. Follow the established patterns and conventions
+4. Test thoroughly on both simulator and hardware
+5. Document any new APIs or interfaces
+6. Consider power consumption and memory usage
+7. Ensure proper error handling and edge cases 
